@@ -1,0 +1,26 @@
+import Image from "next/image";
+
+import rauchgPhoto from "../../public/images/my.png";
+
+export const metadata = {
+  title: 'Tang\'s Blog - About',
+  description: 'An overview of my career and technical contributions',
+  openGraph: {
+    title: 'Vercel',
+    description: 'An overview of my career and technical contributions',
+    images: [{ url: '/about/opengraph-image' }]
+  }
+}
+
+# About
+
+<a href="https://github.com/summer-boythink" target="_blank">
+  <Image
+    src={rauchgPhoto}
+    alt="Guillermo Rauch"
+    className="rounded-full bg-gray-100 block mt-2 mb-5 w-48 h-48 mx-auto sm:float-right sm:ml-5 sm:mb-5 object-contain object-bottom"
+    unoptimized
+    priority
+  />
+</a>
+我是一名软件工程师,目前待业中,专注于数据库方向和Linux系统方向的学习.

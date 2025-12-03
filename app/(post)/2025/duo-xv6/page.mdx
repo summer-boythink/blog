@@ -1,0 +1,216 @@
+import fip from "@/public/images/2025/xv6/fip.png";
+import bal from "@/public/images/2025/xv6/bal.png";
+import uart from "@/public/images/2025/xv6/uart.jpg";
+import bugfix from "@/public/images/2025/xv6/bugfix.png";
+import success from "@/public/images/2025/xv6/success.png";
+import uartbug from "@/public/images/2025/xv6/uartbug.png";
+
+
+import Image from "next/image";
+
+export const metadata = {
+  title: '将xv6迁移到duo 256M',
+  description: '记录一次xv6迁移',
+  openGraph: {
+  }
+}
+
+## 起因
+
+前段时间学习了[xv6](https://github.com/mit-pdos/xv6-riscv)的源码后,突发奇想,
+看看能不能将xv6迁移到物理开发板上,于是想起来之前看到过[duo 256M](https://milkv.io/zh/docs/duo/getting-started/duo256m)
+
+然后我又不小心看到了这个 [迁移pr](https://github.com/rv2036/rvspoc-p2308-xv6-riscv/pull/2)
+,但是这个pr是基于[duo 64M](https://milkv.io/zh/docs/duo/getting-started/duo)的,这款又刚好在tb卖断货了. 
+于是,我只能把 duo 256M 开发板买回来,准备试试看效果.
+
+## 烧录镜像
+
+### 1. 准备fip.bin
+
+根据[README](https://github.com/xhackerustc/rvspoc-p2308-xv6-riscv/blob/riscv/README#L78)里描述,由于duo 64M 和 256M 的CPU不一样,
+所以需要的`fip.bin` (包含了OpenSBI等一系列底层引导固件的文件) 也需要不一样.
+
+我翻看了`milkv duo` 官方的文档,并没有找到现成了`fip.bin`. 
+正准备自己编译前,突发奇想:既然fip是用于引导固件的,官方肯定提供了基础的 `buildroot` 的 img.
+
+这个官方的img里肯定有`fip.bin`.
+如果有办法从官方的img里直接提取`fip.bin`不就好了嘛.
+
+于是我询问`deepseek`,找到了提取之法
+
+<Image
+    src={fip}
+    alt="fip"
+    unoptimized
+    priority
+  />
+
+
+OK ! ! 有了fip后,我们只需要跟着`README`里的流程编译一份`milkv-duo_sdcard.img` 
+
+镜像准备阶段就可以大功告成了.
+
+### 2.使用balenaEtcher烧录镜像
+
+这个GitHub开源的工具,用于烧入镜像,十分推荐好用
+<Image
+    src={bal}
+    alt="bal"
+    unoptimized
+    priority
+  />
+
+
+## UART连接调试
+
+由于前两天刚好给树莓派换了风扇,就准备用它配合开发板来进行串口测试了.
+
+将开发板的地线和树莓派的地线连接,然后将两者`UART`互相连接.如下图所示
+
+<Image
+    src={uart}
+    alt="uart"
+    unoptimized
+    priority
+  />
+
+然后我们在树莓派的终端配置`minicom`的串口波特率
+
+```sh
+sudo minicom -D /dev/ttyS0 -b 115200 -8
+```
+
+之后将开发板用树莓派的USB口通电,接着uart就会开始输出以下内容
+
+```sh
+# ......
+SD/0x2aa00/0x200/0x200/0.L2/0x414d3342/0xcafea542/0x80200000/0x37400/0x37400
+COMP/1.
+SD/0x2aa00/0x37400/0x37400/0.DCP/0x80200020/0x1000000/0x81900020/0x37400/1.
+DCP/0x73f43/0.
+Loader_2nd loaded.
+Use internal 32k
+Jump to monitor at 0x80000000.
+OPENSBI: next_addr=0x80200020 arg1=0x80080000
+OpenSBI v0.9
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name             : Milk-V Duo256M
+Platform Features         : mfdeleg
+Platform HART Count       : 1
+Platform IPI Device       : clint
+Platform Timer Device     : clint
+Platform Console Device   : uart8250
+Platform HSM Device       : ---
+Platform SysReset Device  : ---
+Firmware Base             : 0x80000000
+Firmware Size             : 132 KB
+Runtime SBI Version       : 0.3
+# .....
+```
+
+可以看到我们的`fip.bin`已经成功被引导了.
+
+
+## 解决bug
+就在我非常开心的时候,第一个`bug`出现了.
+
+控制台输出了:
+```sh
+Starting kernel ...
+
+
+xv6 kernel is booting
+
+SBI specification v0.3 detected
+SBI TIME extension detected
+SBI IPI extension detected
+SBI RFNC extension detected
+SBI HSM extension detected
+
+usertrap(): unexpected scause 0xd pid=1
+            sepc=0 stval=0x505050505
+panic: init exiting
+```
+
+看起来是xv6的`userinit()`部分出现了panic.
+但是`kernel` 已经成功启动了,为什么用户空间会出现问题呢?
+这也太抽象了~~
+
+于是我又开始翻阅,找到了一个[同样的问题](https://github.com/rv2036/rvspoc-p2308-xv6-riscv/pull/2#issuecomment-1980009618)
+
+下面给出的回复是
+
+<Image
+    src={bugfix}
+    alt="bugfix"
+    unoptimized
+    priority
+  />
+
+好吧~ 我不管.
+
+反正奇妙的 `gcc` 背锅. 
+
+作者给出的原因是: `FSSIZE` 太小
+```
+FSSIZE 定义了 mkfs（制作文件系统）工具创建的虚拟磁盘的大小（以磁盘块为单位）。
+当编译生成的所有用户程序（/init, /sh, /ls 等）的总大小非常接近
+甚至达到 FSSIZE 定义的上限时，
+文件系统就没有足够空间来记录自身的元数据（如 inode、目录项），导致初始化失败。
+```
+
+看起来是用户程序把`FSSIZE`占满了,导致元数据没地方放了,于是发生了`panic`.
+
+
+好吧,在我把`FSSIZE`调大之后问题果然解决了
+
+## 效果演示
+
+成功进入`xv6`后,我们可以简单演示一下效果
+
+
+<Image
+    src={success}
+    alt="success"
+    unoptimized
+    priority
+  />
+
+好消息: 进入系统,并且使用这些用户进程都没问题
+
+坏消息: `uart` 输出乱码了
+
+## 写在最后
+
+虽然说这种半开荒行为挺好玩的,不过各种奇怪的行为也是多.
+
+我查阅了 duo 256M 的 `UART_CLOCK` 频率,确实是 25MHZ.
+
+<Image
+    src={uartbug}
+    alt="uartbug"
+    unoptimized
+    priority
+  />
+
+那问题就不在我编译好的 `img` 上,可能是树莓派的时钟频率和开发板不一致造成的.
+
+还有一个小问题是,每次我进入开发板都要手动引导一下
+```sh
+
+cv181x_c906# fatload mmc 0:1 0x83000000 boot.sd
+cv181x_c906# bootm 0x83000000#config-cv1800b_milkv_duo_sd
+
+```
+
+不过这些都不影响正常进入`xv6`,以后有空再来解决吧！
+

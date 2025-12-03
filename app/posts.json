@@ -4,6 +4,11 @@
       "id": "new-blog",
       "date": "Dec 01, 2025",
       "title": "new blog - 新的博客伊始"
+    },
+    {
+      "id": "duo-xv6",
+      "date": "Dec 03, 2025",
+      "title": "将xv6迁移到duo 256M"
     }
   ]
 }
